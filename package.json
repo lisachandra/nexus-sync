@@ -76,6 +76,7 @@
     }
   },
   "scripts": {
+    "build:plugin": "rojo build \"roblox_plugin/src/Nexus Sync/default.project.json\" -o roblox_plugin/NexusSync.rbxm",
     "lint": "eslint .",
     "pretest": "npm run lint",
     "test": "vscode-test"

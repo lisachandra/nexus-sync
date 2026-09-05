@@ -2,3 +2,5 @@ node_modules
 .vscode-test/
 *.vsix
 creator-docs
+roblox_plugin/NexusSync.rbxm
+*.rbxm
