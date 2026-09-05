@@ -10,6 +10,8 @@ local Output = {
 	UploadInterval = 1/15;
 	PendingLogs = false;
 	Busy = false;
+	Seen = {};
+	Backfilled = false;
 	Logs = {
 		Uploaded = 0;
 		Count = 0;
@@ -31,6 +33,15 @@ export type OutputLogs = {
 export type StackTrace = {
 	[number]: string
 }
+
+local function MessageTypeName(Type: any): string
+	if typeof(Type) == "string" then
+		return Type
+	elseif typeof(Type) == "EnumItem" then
+		return Type.Name
+	end
+	return "MessageOutput"
+end
 
 function Output:Upload(Logs: OutputLogs, Count: number)
 	local Data = {
@@ -64,9 +75,42 @@ function Output:Collect(Count: number): OutputLogs
 	
 	return Logs
 end
+function Output:BackfillReplay()
+	if Output.Backfilled then
+		return
+	end
+	Output.Backfilled = true
+
+	local ok, History = pcall(function()
+		return LogService:GetLogHistory()
+	end)
+	if not ok then
+		return
+	end
+
+	local Earliest = Server.StartTime
+
+	for _, Entry in ipairs(History) do
+		local Timestamp = Entry.timestamp
+		if typeof(Timestamp) == "number" and (Earliest == nil or Timestamp >= Earliest) then
+			local Signature = tostring(Timestamp) .. "|" .. tostring(Entry.message)
+			if not Output.Seen[Signature] then
+				Output.Seen[Signature] = true
+				Output:Insert({
+					["timestamp"] = Timestamp;
+					["messageType"] = MessageTypeName(Entry.messageType);
+					["message"] = Entry.message or "";
+				})
+			end
+		end
+	end
+end
+
+
 
 function Output:Flush(Count: number)	
 	Server:UpdateStartTime()
+	Output:BackfillReplay()
 	
 	if not Output.Busy then
 		Output.Busy = true
@@ -118,6 +162,16 @@ end
 
 function Output:Load()
 	Server:AutoConnect()
+	Server:UpdateStartTime()
+
+	task.spawn(function()
+		task.wait(Output.UploadInterval * 2)
+		if not Output.Backfilled then
+			Output:BackfillReplay()
+			task.wait(Output.UploadInterval)
+			Output:Flush(Output.Logs.Count)
+		end
+	end)
 	
 	Cleanup:Hook().OutputQueue = task.spawn(function()
 		while task.wait(Output.UploadInterval) do
@@ -130,8 +184,9 @@ function Output:Load()
 	end)
 
 	Cleanup:Hook().MessageOut = LogService.MessageOut:Connect(function(Message: string, Type: Enum.MessageType)
+		local Timestamp = DateTime.now().UnixTimestampMillis
 		local Log = {
-			["timestamp"] = DateTime.now().UnixTimestampMillis;
+			["timestamp"] = Timestamp;
 			["messageType"] = Type.Name;
 			["message"] = Message;
 		}
@@ -140,6 +195,7 @@ function Output:Load()
 			Log.messageType = "MessageTrace"
 		end
 
+		Output.Seen[tostring(Timestamp) .. "|" .. Message] = true
 		Output:Insert(Log)
 	end)
 end

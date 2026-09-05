@@ -12,11 +12,12 @@ let server;
 function parseOutputLogs(body) {
     const { StartTime, PlaceId, GUID, Logs } = JSON.parse(body);
 
-    if (!outputSessions.has(GUID)) {
-        outputSessions.set(GUID, 0);
+    const sessionKey = `${GUID}:${PlaceId}`;
+    if (!outputSessions.has(sessionKey)) {
+        outputSessions.set(sessionKey, 0);
     }
-
     return {
+        sessionKey,
         startTime: StartTime,
         placeId: PlaceId,
         GUID: GUID,
@@ -31,7 +32,7 @@ function isDuplicate(log) {
         return false;
     }
 
-    const sessionLogs = recentLogs.get("All") || [];
+    const sessionLogs = recentLogs.get(log.sessionKey) || [];
     const now = log.timestamp;
 
     const recentLogsOnly = sessionLogs.filter(entry => now - entry.timestamp <= 100);
@@ -43,7 +44,7 @@ function isDuplicate(log) {
         console.debug(`[Duplicate] '${log.message}' seen at ${now}`);
     }
 
-    recentLogs.set("All", recentLogsOnly);
+    recentLogs.set(log.sessionKey, recentLogsOnly);
 
     return duplicateFound;
 }
@@ -54,8 +55,8 @@ function sortOutputLogs(data) {
     sortedLogs.forEach(([key, log]) => {
         const logNumber = Number(key);
 
-        if (logNumber > outputSessions.get(data.GUID) && log !== null && !isDuplicate(log)) {
-            outputSessions.set(data.GUID, logNumber);
+        if (logNumber > outputSessions.get(data.sessionKey) && log !== null && !isDuplicate({ ...log, sessionKey: data.sessionKey })) {
+            outputSessions.set(data.sessionKey, logNumber);
 
             if (log.timestamp >= data.startTime) {
                 if (log.message.startsWith("TestService")) {
@@ -96,6 +97,7 @@ function handleConnectError(error, port) {
 function start(port) {
     if (!isServerRunning()) {
         recentLogs.clear();
+        outputSessions.clear();
         output.start();
 
         server = http.createServer((req, res) => {

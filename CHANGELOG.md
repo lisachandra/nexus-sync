@@ -2,6 +2,21 @@
 
 All notable changes to Nexus Sync will be documented in this file.
 
+## `0.5.0` - 2025
+
+- Fixed Studio output not appearing in Run Mode and single-player Play tests.
+  - The plugin no longer exits when a Run simulation starts (`IsRunMode`), so
+    it stays connected and streams output during Run-mode runs (as driven by
+    test runners like Drillbit/jest-roblox via `StudioTestService`).
+  - The plugin widget is only constructed in Edit mode, so plugin copies
+    inside playtest server/client data models no longer error on edit-only
+    dock-GUI APIs before the output listener is set up.
+- Replays `LogService:GetLogHistory()` once on connect so logs emitted before
+  the extension's HTTP server was reachable are forwarded instead of dropped.
+- Deduplication is now scoped per session (`GUID` + `PlaceId`) so output from
+  the Edit and playtest data-model copies is not lost or double-printed.
+
+
 ## `0.4.5` - May 22nd, 2025
 
 - Added a vscode setting to help prevent duplicated output logs

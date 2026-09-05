@@ -53,4 +53,7 @@ Currently there is only one `Roblox Studio` channel that all the output messages
 
 ### Play Tests
 
-As of this time there are no detections in place yet to clear the output whenever a test session is launched.
+Output now streams during Run-mode simulations and single-player Play tests; the
+plugin listens on every data-model instance it runs in (Edit, Run, and playtest
+server/client islands), and logs buffered before the extension's server connects
+are replayed from `LogService:GetLogHistory()`.

@@ -154,7 +154,9 @@ function Widget:Load()
 end
 
 function Widget:Close()
-	widgetGui.Enabled = false
+	if widgetGui then
+		widgetGui.Enabled = false
+	end
 end
 
 return Widget
